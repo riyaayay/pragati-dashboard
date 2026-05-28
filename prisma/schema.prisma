@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ─── ENUMS ────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MD
+  DGM
+  SITE_MANAGER
+  SUPERVISOR
+  DATA_INTERPRETER
+}
+
+enum MachineType {
+  MACHINE   // tracked in Hours
+  VEHICLE   // tracked in KM
+}
+
+enum MachineStatus {
+  RUNNING
+  BREAKDOWN
+  IDLE
+}
+
+enum ApprovalStatus {
+  PENDING_SUPERVISOR
+  PENDING_MANAGER
+  APPROVED
+  REJECTED
+}
+
+enum ComplianceType {
+  INSURANCE
+  RTO_TAX
+  FITNESS
+  PERMIT
+  PUC
+}
+
+enum ComplianceStatus {
+  VALID
+  EXPIRING_SOON   // within 30 days
+  EXPIRED
+}
+
+// ─── CORE TABLES ─────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  siteId       String?  // null = access all sites (MD, DGM, Admin)
+  site         Site?    @relation(fields: [siteId], references: [id])
+  createdAt    DateTime @default(now())
+
+  dprEntries   DprEntry[]
+  reviews      DprReview[]
+
+  @@map("users")
+}
+
+model Site {
+  id           String    @id @default(cuid())
+  name         String    @unique  // "Akkalkot Jeur", "Bidkin New" etc.
+  code         String    @unique  // "A", "B", "C" etc.
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  machines     Machine[]
+  users        User[]
+  dprEntries   DprEntry[]
+
+  @@map("sites")
+}
+
+model Machine {
+  id             String        @id @default(cuid())
+  assetCode      String        @unique  // "PC-DDR-0001"
+  category       String        // "Diesel Dispensor-01"
+  name           String        // "DIESEL DISPENSOR"
+  regNo          String?       // "MH12YB9977"
+  machineType    MachineType   @default(MACHINE)
+  isActive       Boolean       @default(true)
+  siteId         String
+  site           Site          @relation(fields: [siteId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  dprEntries     DprEntry[]
+  breakdownLogs  BreakdownLog[]
+  maintenanceLogs MaintenanceLog[]
+  complianceDocs  ComplianceDoc[]
+
+  @@map("machines")
+}
+
+// ─── DPR (DAILY PROGRESS REPORT) ────────────────────────
+
+model DprEntry {
+  id               String         @id @default(cuid())
+  date             DateTime       @db.Date
+  siteId           String
+  machineId        String
+  operatorName     String?
+
+  // Starting/Closing Reading
+  startingReading  Float?         // hrs for machines, km for vehicles
+  closingReading   Float?
+  totalHrKm        Float?         // auto-computed: closing - starting
+
+  // Diesel tracking
+  dieselOpBal      Float          @default(0)   // opening balance
+  dieselIssued     Float          @default(0)   // issued today
+  totalDiesel      Float          @default(0)   // op bal + issued
+  dieselConsumption Float         @default(0)   // consumed
+  closingDieselBal Float          @default(0)   // total - consumed
+  actualAverage    Float?         // km/l or hrs/l
+  stdAverage       Float?         // standard benchmark
+
+  // Work done
+  workdoneUnit     String?        // m3, m2, km, metric ton etc.
+  workdoneQty      Float?
+  workdoneDetails  String?
+  remarks          String?
+
+  // Approval workflow
+  approvalStatus   ApprovalStatus @default(PENDING_SUPERVISOR)
+  submittedBy      String
+  submittedAt      DateTime       @default(now())
+  submitter        User           @relation(fields: [submittedBy], references: [id])
+
+  site             Site           @relation(fields: [siteId], references: [id])
+  machine          Machine        @relation(fields: [machineId], references: [id])
+  reviews          DprReview[]
+
+  @@unique([date, machineId])   // one entry per machine per day
+  @@map("dpr_entries")
+}
+
+model DprReview {
+  id          String   @id @default(cuid())
+  dprEntryId  String
+  reviewerId  String
+  role        Role     // SUPERVISOR or SITE_MANAGER
+  status      ApprovalStatus
+  comment     String?
+  reviewedAt  DateTime @default(now())
+
+  dprEntry    DprEntry @relation(fields: [dprEntryId], references: [id])
+  reviewer    User     @relation(fields: [reviewerId], references: [id])
+
+  @@map("dpr_reviews")
+}
+
+// ─── BREAKDOWN / IDLE REPORT ────────────────────────────
+
+model BreakdownLog {
+  id              String        @id @default(cuid())
+  machineId       String
+  status          MachineStatus // RUNNING, BREAKDOWN, IDLE
+  defectNature    String?
+  actionTaken     String?
+  defectFromDate  DateTime?
+  targetRunDate   DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  machine         Machine       @relation(fields: [machineId], references: [id])
+
+  @@map("breakdown_logs")
+}
+
+// ─── PERIODICAL MAINTENANCE ──────────────────────────────
+
+model MaintenanceLog {
+  id                  String    @id @default(cuid())
+  machineId           String
+  serviceNumber       Int       // 1st, 2nd, 3rd, 4th service
+  task                String    // "500 Hrs Service: Oil, Hydraulic oil, TX oil filter change"
+  totalCost           Float?
+  standardHrKm        Float?    // benchmark reading for this service
+  serviceCarriedHrKm  Float?    // actual reading when service done
+  servicedAt          DateTime?
+  nextServiceHrKm     Float?    // trigger reading for next service
+  notes               String?
+  createdAt           DateTime  @default(now())
+
+  machine             Machine   @relation(fields: [machineId], references: [id])
+
+  @@map("maintenance_logs")
+}
+
+// ─── COMPLIANCE DOCUMENTS ───────────────────────────────
+
+model ComplianceDoc {
+  id           String           @id @default(cuid())
+  machineId    String
+  type         ComplianceType   // INSURANCE, RTO_TAX, FITNESS, PERMIT, PUC
+  renewedDate  DateTime?
+  expiryDate   DateTime?
+  amount       Float?
+  status       ComplianceStatus @default(VALID)
+  entryNumber  Int              // 1st, 2nd, 3rd... renewal entry
+  createdAt    DateTime         @default(now())
+
+  machine      Machine          @relation(fields: [machineId], references: [id])
+
+  @@map("compliance_docs")
+}
