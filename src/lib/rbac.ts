@@ -1,11 +1,11 @@
 import { Role } from '@prisma/client'
 
 // Who can VIEW dashboards and reports
-export const CAN_VIEW_ALL_SITES   = [Role.ADMIN, Role.MD, Role.DGM]
-export const CAN_VIEW_REPORTS     = [Role.ADMIN, Role.MD, Role.DGM, Role.SITE_MANAGER]
-export const CAN_REVIEW_DPR       = [Role.SUPERVISOR, Role.SITE_MANAGER]
-export const CAN_SUBMIT_DPR       = [Role.DATA_INTERPRETER]
-export const CAN_MANAGE_SYSTEM    = [Role.ADMIN]
+export const CAN_VIEW_ALL_SITES:  Role[] = [Role.ADMIN, Role.MD, Role.DGM]
+export const CAN_VIEW_REPORTS:    Role[] = [Role.ADMIN, Role.MD, Role.DGM, Role.SITE_MANAGER]
+export const CAN_REVIEW_DPR:      Role[] = [Role.SUPERVISOR, Role.SITE_MANAGER]
+export const CAN_SUBMIT_DPR:      Role[] = [Role.DATA_INTERPRETER]
+export const CAN_MANAGE_SYSTEM:   Role[] = [Role.ADMIN]
 
 export function canViewAllSites(role: Role): boolean {
   return CAN_VIEW_ALL_SITES.includes(role)
