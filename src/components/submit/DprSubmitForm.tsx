@@ -78,7 +78,7 @@ export default function DprSubmitForm({ siteId, userName }: { siteId: string; us
             <div className="font-bold">Pragati Group · DPR Entry</div>
             <div className="text-orange-100 text-xs">{userName} · {todayDate}</div>
           </div>
-          <button onClick={() => signOut({ callbackUrl: '/login' })}
+          <button onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
             className="text-orange-100 text-xs">Sign out</button>
         </div>
       </div>

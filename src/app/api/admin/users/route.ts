@@ -33,8 +33,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   }
 
-  const body   = await req.json()
-  const parsed = createUserSchema.parse(body)
+  const body = await req.json()
+
+  let parsed: ReturnType<typeof createUserSchema.parse>
+  try {
+    parsed = createUserSchema.parse(body)
+  } catch (err: any) {
+    const msg = err.errors?.[0]?.message || 'Invalid input'
+    return NextResponse.json({ error: msg }, { status: 400 })
+  }
 
   const existing = await prisma.user.findUnique({ where: { email: parsed.email } })
   if (existing) return NextResponse.json({ error: 'Email already exists' }, { status: 400 })

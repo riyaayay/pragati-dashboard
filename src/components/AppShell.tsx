@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { getNavItems } from '@/lib/rbac'
+
+// Always redirect to login on the same host:port the user is currently on
+const doSignOut = () => signOut({ callbackUrl: `${window.location.origin}/login` })
 import { Role } from '@prisma/client'
 
 const ICONS: Record<string, string> = {
@@ -72,7 +75,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Sign out */}
         <div className="px-3 pb-4">
-          <button onClick={() => signOut({ callbackUrl: '/login' })}
+          <button onClick={() => doSignOut()}
             className="w-full text-left px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
             Sign out
           </button>

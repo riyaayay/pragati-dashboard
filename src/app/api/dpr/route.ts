@@ -60,12 +60,21 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
+  // Parse all numeric fields — form inputs send strings, Prisma needs Float
+  const startingReading  = body.startingReading  != null ? parseFloat(body.startingReading)  : null
+  const closingReading   = body.closingReading   != null ? parseFloat(body.closingReading)   : null
+  const dieselOpBal      = parseFloat(body.dieselOpBal)      || 0
+  const dieselIssued     = parseFloat(body.dieselIssued)     || 0
+  const dieselConsumption= parseFloat(body.dieselConsumption)|| 0
+  const stdAverage       = body.stdAverage != null ? parseFloat(body.stdAverage) : null
+  const workdoneQty      = body.workdoneQty != null ? parseFloat(body.workdoneQty) : null
+
   // Auto-compute derived fields
-  const totalHrKm        = (body.closingReading || 0) - (body.startingReading || 0)
-  const totalDiesel      = (body.dieselOpBal || 0) + (body.dieselIssued || 0)
-  const closingDieselBal = totalDiesel - (body.dieselConsumption || 0)
-  const actualAverage    = body.dieselConsumption > 0
-    ? parseFloat((totalHrKm / body.dieselConsumption).toFixed(2))
+  const totalHrKm        = (closingReading || 0) - (startingReading || 0)
+  const totalDiesel      = dieselOpBal + dieselIssued
+  const closingDieselBal = totalDiesel - dieselConsumption
+  const actualAverage    = dieselConsumption > 0
+    ? parseFloat((totalHrKm / dieselConsumption).toFixed(2))
     : null
 
   try {
@@ -74,21 +83,21 @@ export async function POST(req: NextRequest) {
         date:             new Date(body.date),
         siteId:           user.siteId,
         machineId:        body.machineId,
-        operatorName:     body.operatorName,
-        startingReading:  body.startingReading,
-        closingReading:   body.closingReading,
+        operatorName:     body.operatorName     || null,
+        startingReading,
+        closingReading,
         totalHrKm,
-        dieselOpBal:      body.dieselOpBal      || 0,
-        dieselIssued:     body.dieselIssued     || 0,
+        dieselOpBal,
+        dieselIssued,
         totalDiesel,
-        dieselConsumption:body.dieselConsumption || 0,
+        dieselConsumption,
         closingDieselBal,
         actualAverage,
-        stdAverage:       body.stdAverage,
-        workdoneUnit:     body.workdoneUnit,
-        workdoneQty:      body.workdoneQty,
-        workdoneDetails:  body.workdoneDetails,
-        remarks:          body.remarks,
+        stdAverage,
+        workdoneUnit:     body.workdoneUnit     || null,
+        workdoneQty,
+        workdoneDetails:  body.workdoneDetails  || null,
+        remarks:          body.remarks          || null,
         submittedBy:      user.id,
         approvalStatus:   'PENDING_SUPERVISOR',
       },
